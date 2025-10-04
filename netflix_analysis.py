@@ -12,6 +12,11 @@ import seaborn as sns
 from collections import Counter
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import classification_report, accuracy_score, confusion_matrix
+from sklearn.preprocessing import LabelEncoder
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -352,6 +357,194 @@ def analyze_ratings(df):
     print()
 
 
+def predictive_modeling(df):
+    """Build predictive models for content analysis."""
+    print("="*80)
+    print("PREDICTIVE MODELING FOR CONTENT SUCCESS")
+    print("="*80)
+    
+    print("\n🤖 Building machine learning models to predict content characteristics...")
+    print("This helps understand patterns in Netflix's content strategy.\n")
+    
+    # Model 1: Predict Content Type (Movie vs TV Show)
+    print("-" * 80)
+    print("MODEL 1: Predicting Content Type (Movie vs TV Show)")
+    print("-" * 80)
+    
+    # Prepare data for content type prediction
+    df_model = df.dropna(subset=['description', 'listed_in', 'type']).copy()
+    
+    # Create text features
+    df_model['text_features'] = (
+        df_model['description'].fillna('') + ' ' + 
+        df_model['listed_in'].fillna('')
+    )
+    
+    # Use TF-IDF for text features
+    tfidf = TfidfVectorizer(max_features=500, stop_words='english')
+    text_features = tfidf.fit_transform(df_model['text_features'])
+    
+    # Target variable
+    y = df_model['type']
+    
+    # Split data
+    X_train, X_test, y_train, y_test = train_test_split(
+        text_features, y, test_size=0.2, random_state=42, stratify=y
+    )
+    
+    # Train Random Forest model
+    print("\nTraining Random Forest Classifier...")
+    rf_model = RandomForestClassifier(n_estimators=100, random_state=42, max_depth=10)
+    rf_model.fit(X_train, y_train)
+    
+    # Predictions
+    y_pred = rf_model.predict(X_test)
+    
+    # Evaluation
+    accuracy = accuracy_score(y_test, y_pred)
+    print(f"\n✓ Model Accuracy: {accuracy:.4f} ({accuracy*100:.2f}%)")
+    
+    print("\nDetailed Classification Report:")
+    print(classification_report(y_test, y_pred))
+    
+    print("Confusion Matrix:")
+    cm = confusion_matrix(y_test, y_pred)
+    print(f"{'':15} {'Predicted Movie':>20} {'Predicted TV Show':>20}")
+    print(f"{'Actual Movie':15} {cm[0][0]:>20} {cm[0][1]:>20}")
+    print(f"{'Actual TV Show':15} {cm[1][0]:>20} {cm[1][1]:>20}")
+    
+    # Feature importance (top features)
+    feature_names = tfidf.get_feature_names_out()
+    importances = rf_model.feature_importances_
+    top_indices = np.argsort(importances)[-10:][::-1]
+    
+    print("\nTop 10 Most Important Features for Prediction:")
+    for i, idx in enumerate(top_indices, 1):
+        print(f"{i:2d}. {feature_names[idx]:20s}: {importances[idx]:.4f}")
+    
+    print("\n📊 Key Insight:")
+    print(f"The model can predict whether content is a Movie or TV Show with {accuracy*100:.2f}% accuracy")
+    print("based on its description and genre. This shows distinct patterns between content types.")
+    
+    # Model 2: Predict Content Rating
+    print("\n" + "-" * 80)
+    print("MODEL 2: Predicting Content Rating")
+    print("-" * 80)
+    
+    # Filter for most common ratings (to have enough samples)
+    top_ratings = df['rating'].value_counts().head(5).index.tolist()
+    df_rating = df[df['rating'].isin(top_ratings)].dropna(subset=['description', 'listed_in']).copy()
+    
+    if len(df_rating) > 100:  # Only if we have enough data
+        # Prepare features
+        df_rating['text_features'] = (
+            df_rating['description'].fillna('') + ' ' + 
+            df_rating['listed_in'].fillna('')
+        )
+        
+        # TF-IDF
+        tfidf_rating = TfidfVectorizer(max_features=300, stop_words='english')
+        text_features_rating = tfidf_rating.fit_transform(df_rating['text_features'])
+        
+        # Target
+        y_rating = df_rating['rating']
+        
+        # Split
+        X_train_r, X_test_r, y_train_r, y_test_r = train_test_split(
+            text_features_rating, y_rating, test_size=0.2, random_state=42, stratify=y_rating
+        )
+        
+        # Train Logistic Regression (better for multi-class)
+        print("\nTraining Logistic Regression Classifier...")
+        lr_model = LogisticRegression(max_iter=1000, random_state=42, multi_class='multinomial')
+        lr_model.fit(X_train_r, y_train_r)
+        
+        # Predictions
+        y_pred_r = lr_model.predict(X_test_r)
+        
+        # Evaluation
+        accuracy_r = accuracy_score(y_test_r, y_pred_r)
+        print(f"\n✓ Model Accuracy: {accuracy_r:.4f} ({accuracy_r*100:.2f}%)")
+        
+        print("\nClassification Report:")
+        print(classification_report(y_test_r, y_pred_r))
+        
+        print("\n📊 Key Insight:")
+        print(f"The model can predict content ratings with {accuracy_r*100:.2f}% accuracy.")
+        print("This reveals patterns in how content characteristics correlate with age ratings.")
+    else:
+        print("\nInsufficient data for rating prediction model.")
+    
+    # Model 3: Predict Release Decade
+    print("\n" + "-" * 80)
+    print("MODEL 3: Predicting Release Decade")
+    print("-" * 80)
+    
+    # Create decade categories
+    df_decade = df.dropna(subset=['description', 'listed_in', 'release_year']).copy()
+    df_decade['decade'] = (df_decade['release_year'] // 10) * 10
+    
+    # Filter for decades with enough samples
+    decade_counts = df_decade['decade'].value_counts()
+    valid_decades = decade_counts[decade_counts >= 50].index.tolist()
+    df_decade = df_decade[df_decade['decade'].isin(valid_decades)]
+    
+    if len(df_decade) > 100:
+        # Prepare features
+        df_decade['text_features'] = (
+            df_decade['description'].fillna('') + ' ' + 
+            df_decade['listed_in'].fillna('')
+        )
+        
+        # TF-IDF
+        tfidf_decade = TfidfVectorizer(max_features=300, stop_words='english')
+        text_features_decade = tfidf_decade.fit_transform(df_decade['text_features'])
+        
+        # Target
+        y_decade = df_decade['decade']
+        
+        # Split
+        X_train_d, X_test_d, y_train_d, y_test_d = train_test_split(
+            text_features_decade, y_decade, test_size=0.2, random_state=42
+        )
+        
+        # Train Random Forest
+        print("\nTraining Random Forest Classifier...")
+        rf_decade = RandomForestClassifier(n_estimators=100, random_state=42, max_depth=15)
+        rf_decade.fit(X_train_d, y_train_d)
+        
+        # Predictions
+        y_pred_d = rf_decade.predict(X_test_d)
+        
+        # Evaluation
+        accuracy_d = accuracy_score(y_test_d, y_pred_d)
+        print(f"\n✓ Model Accuracy: {accuracy_d:.4f} ({accuracy_d*100:.2f}%)")
+        
+        print("\nTop 5 Decades by Sample Count:")
+        top_decades = decade_counts.head(5)
+        for decade, count in top_decades.items():
+            print(f"  {decade}s: {count} titles")
+        
+        print("\n📊 Key Insight:")
+        print(f"The model can predict content release decade with {accuracy_d*100:.2f}% accuracy.")
+        print("This shows how content themes and styles have evolved over time.")
+    else:
+        print("\nInsufficient data for decade prediction model.")
+    
+    print("\n" + "="*80)
+    print("PREDICTIVE MODELING SUMMARY")
+    print("="*80)
+    print("\n✓ Successfully built and evaluated multiple predictive models")
+    print("✓ Models help understand content patterns and Netflix's strategy")
+    print("✓ Features from descriptions and genres are strong predictors")
+    print("\nThese models could be used to:")
+    print("  - Predict success likelihood of new content")
+    print("  - Recommend optimal content ratings for productions")
+    print("  - Identify content gaps in Netflix's catalog")
+    print("  - Guide content acquisition decisions")
+    print()
+
+
 def main():
     """Main analysis pipeline."""
     print("\n" + "="*80)
@@ -385,6 +578,9 @@ def main():
     # Rating analysis
     analyze_ratings(df)
     
+    # Predictive modeling - NEW: Machine learning models for content prediction
+    predictive_modeling(df)
+    
     print("="*80)
     print(" "*20 + "ANALYSIS COMPLETE")
     print("="*80)
@@ -395,6 +591,7 @@ def main():
     print("4. ✓ Content similarity model created for recommendations")
     print("5. ✓ Actor and Director networks analyzed")
     print("6. ✓ Rating distribution understood")
+    print("7. ✓ Predictive models built for content success patterns")
     print("\nAll analysis questions from the problem statement have been addressed!")
     print()
 

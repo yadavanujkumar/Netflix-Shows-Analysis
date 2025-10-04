@@ -97,12 +97,19 @@ This will generate various visualizations and insights about the Netflix dataset
 - Actor and Director collaboration networks
 - Most prolific actors and directors
 
+### 7. Predictive Modeling
+- Machine learning models to predict content characteristics
+- Content type prediction (Movie vs TV Show)
+- Content rating prediction based on descriptions and genres
+- Release decade prediction from content features
+- Model evaluation with accuracy metrics and feature importance
+
 ## Future Enhancements
 - Integration with IMDB ratings dataset for quality analysis
 - Integration with Rotten Tomatoes for critic vs audience reception
 - Sentiment analysis on content descriptions
-- Predictive modeling for content success
 - Time series analysis of content addition patterns
+- Advanced deep learning models for content success prediction
 
 ## License
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
